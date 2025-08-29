@@ -1,72 +1,173 @@
 # Image Generation Transformer
 
-A PyTorch-based project for vision transformers and image generation.
+A PyTorch-based Vision Transformer Variational Autoencoder (VAE) for image generation and reconstruction.
 
-## Setup
+![Training Progress](animation.gif)
 
-### Virtual Environment
+## Overview
 
-This project uses a Python virtual environment. To activate it:
+This project implements a **TransformerVAE** that combines Vision Transformer architecture with Variational Autoencoder principles. The model learns to encode images into latent representations and decode them back to reconstructed images, enabling both image reconstruction and generation.
 
-```bash
-source .venv/bin/activate
-```
+## Architecture
 
-To deactivate:
-```bash
-deactivate
-```
+### Key Components
+
+- **TransformerEncoder**: Converts full images to latent vectors using patch embeddings and transformer layers
+- **TransformerDecoder**: Converts latent vectors back to full images using transformer layers and patch decoding  
+- **TransformerVAE**: Main model that combines encoder and decoder with VAE sampling
+
+### Design Principles
+
+- **Clean Separation**: Encoder and decoder handle full images and patch operations internally
+- **VAE Integration**: Proper variational autoencoder with reconstruction and KL divergence losses
+- **Patch-based Processing**: Efficient image processing using configurable patch sizes
+- **Self-attention**: Multi-head attention mechanisms for capturing image dependencies
+
+## Features
+
+- ✅ **Working Training Pipeline**: Complete training loop with MNIST dataset
+- ✅ **Progress Visualization**: Automatic generation of training progress plots
+- ✅ **GIF Animation**: Creates animated GIF showing training progress
+- ✅ **Model Persistence**: Save/load functionality with metadata preservation
+- ✅ **Device Support**: CPU, CUDA, and Apple Silicon (MPS) support
+- ✅ **Flexible Dimensions**: Configurable image sizes, patch sizes, and model dimensions
+
+## Quick Start
 
 ### Installation
 
-All required packages are already installed in the virtual environment. If you need to reinstall them:
-
 ```bash
+# Clone the repository
+git clone <your-repo-url>
+cd img-gen-transformer
+
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Installed Packages
+### Training
 
-### Core PyTorch
-- **torch**: PyTorch deep learning framework
-- **torchvision**: Computer vision utilities for PyTorch
-- **torchaudio**: Audio processing utilities for PyTorch
+```bash
+# Train the model on MNIST dataset
+python train.py
+```
 
-### Data Science & Visualization
-- **numpy**: Numerical computing
-- **pandas**: Data manipulation and analysis
-- **matplotlib**: Plotting and visualization
-- **seaborn**: Statistical data visualization
+This will:
+- Download MNIST dataset automatically
+- Train the TransformerVAE for 10 epochs
+- Generate progress plots every 100 steps
+- Create an animated GIF showing training progress
+- Save the trained model as `model.pth`
 
-### Development Tools
-- **jupyter**: Jupyter notebook environment
-- **ipykernel**: IPython kernel for Jupyter
-- **tqdm**: Progress bars for loops
+### Model Configuration
 
-### Additional Dependencies
-- **pillow**: Image processing (PIL)
-- **sympy**: Symbolic mathematics
-- **networkx**: Graph theory and network analysis
+The current implementation uses:
+- **Dataset**: MNIST (28×28 grayscale images)
+- **Model**: 128 embedding dim, 4 attention heads, 4 transformer layers
+- **Patches**: 4×4 patch size
+- **Training**: Adam optimizer, learning rate 1e-3, batch size 128
+
+## Usage
+
+### Basic Model Creation
+
+```python
+from network import TransformerVAE
+
+model = TransformerVAE(
+    embed_dim=128,        # Embedding dimension
+    num_channels=1,       # Grayscale images
+    num_heads=4,          # Number of attention heads
+    num_layers=4,         # Number of transformer layers
+    patch_size=4,         # Size of image patches
+    image_size=(28, 28)   # Input image dimensions
+)
+```
+
+### Training
+
+```python
+from runner import Runner
+import torch.optim as optim
+
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
+runner = Runner(model, optimizer, device)
+
+# Train the model
+runner.train(train_loader, epochs=10)
+```
+
+### Generation
+
+```python
+# Generate new images from random latent vectors
+generated_images = runner.generate(num_samples=4)
+```
+
+### Model Persistence
+
+```python
+# Save model
+model.save("model.pth")
+
+# Load model
+new_model = TransformerVAE(...)
+new_model.load("model.pth")
+```
 
 ## Project Structure
 
 ```
 img-gen-transformer/
-├── .venv/                 # Virtual environment
-├── .gitignore            # Git ignore file
-├── requirements.txt       # Python dependencies
-└── README.md            # This file
+├── network.py           # Core model architecture
+├── runner.py            # Training and generation utilities
+├── train.py             # Main training script
+├── requirements.txt     # Python dependencies
+├── animation.gif        # Training progress animation
+└── README.md           # This file
 ```
 
-## Usage
+## Dependencies
 
-1. Activate the virtual environment: `source .venv/bin/activate`
-2. Start Jupyter: `jupyter lab` or `jupyter notebook`
-3. Or run Python scripts directly: `python your_script.py`
+- **PyTorch**: Deep learning framework
+- **torchvision**: Computer vision utilities
+- **numpy**: Numerical computing
+- **tqdm**: Progress bars
+- **matplotlib**: Plotting and visualization
+- **PIL**: Image processing
 
-## Notes
+## Results
 
-- The virtual environment is set up with Python 3.13
-- PyTorch is installed with CPU support (optimized for macOS ARM64)
-- All packages are compatible with the latest stable versions
-- The `.gitignore` file is configured to exclude common PyTorch project files like model checkpoints, datasets, and logs
+The model successfully trains on MNIST digits, with loss decreasing from ~2900 to ~70 over 10 epochs. The training progress is visualized through automatically generated plots and compiled into an animated GIF showing the model's learning progression.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT License
+
+Copyright (c) 2025 Jordan Lei
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
