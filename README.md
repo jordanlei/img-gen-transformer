@@ -1,33 +1,78 @@
-# Image Generation Transformer
+# Steerable Image Generation Transformer
 
-A PyTorch-based Vision Transformer Variational Autoencoder (VAE) for image generation and reconstruction.
+A PyTorch-based **Steerable Vision Transformer Variational Autoencoder (VAE)**. In other words, we created a VAE that can take an optional input which specifies *which* class should be generated from a given latent embedding.
 
-![Training Progress](animation.gif)
+![Training Progress](animation_steerable.gif)
 
 ## Overview
 
-This project implements a **TransformerVAE** that combines Vision Transformer architecture with Variational Autoencoder principles. The model learns to encode images into latent representations and decode them back to reconstructed images, enabling both image reconstruction and generation.
+This project implements a **Steerable TransformerVAE** that combines Vision Transformer architecture with Variational Autoencoder principles. One key component is the ability to **steer** image generation by providing class labels, allowing you to generate images of specific classes (e.g., "generate a 7" or "generate a 3").
+
+The model learns to:
+- Encode images into latent representations with class information
+- Decode latent vectors back to images conditioned on class labels
+- Generate new images of specific classes by providing class cues
+- Maintain consistency between intended class and generated image
+
+## Approach
+
+The steerable VAE optimizes a multi-objective loss function that combines four key components:
+
+### Loss Function
+
+$$\mathcal{L}_{total} = \mathcal{L}_{recon} + \mathcal{L}_{KL} + \mathcal{L}_{class} + 10 \cdot \mathcal{L}_{steer}$$
+
+#### 1. Reconstruction Loss
+$$\mathcal{L}_{recon} = \frac{1}{N} \sum_{i=1}^{N} ||x_i - \hat{x}_i||_2^2$$
+
+Ensures accurate reconstruction of input images.
+
+#### 2. KL Divergence Loss
+$$\mathcal{L}_{KL} = -\frac{1}{2N} \sum_{i=1}^{N} \sum_{j=1}^{D} (1 + \log(\sigma_{ij}^2) - \mu_{ij}^2 - \sigma_{ij}^2)$$
+
+Regularizes the latent space to follow a standard normal distribution.
+
+#### 3. Classification Loss
+$$\mathcal{L}_{class} = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} y_{ic} \log(p_{ic})$$
+
+Trains the encoder to correctly classify input images using cross-entropy.
+
+#### 4. Steering Loss
+$$\mathcal{L}_{steer} = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} \tilde{y}_{ic} \log(\tilde{p}_{ic})$$
+
+Where $\tilde{y}$ are random class labels and $\tilde{p}$ are the predicted classes of generated images. This enforces consistency between intended and generated classes, making the VAE steerable.
+
+### Teacher Forcing
+
+During training, the model uses ground truth class labels for stable learning. During inference, it uses its own predictions, enabling controlled generation of specific classes.
 
 ## Architecture
 
 ### Key Components
 
-- **TransformerEncoder**: Converts full images to latent vectors using patch embeddings and transformer layers
-- **TransformerDecoder**: Converts latent vectors back to full images using transformer layers and patch decoding  
-- **TransformerVAE**: Main model that combines encoder and decoder with VAE sampling
+- **TransformerEncoder**: Converts full images to latent vectors and class predictions using patch embeddings and transformer layers
+- **TransformerDecoder**: Converts latent vectors back to full images conditioned on class labels using transformer layers and patch decoding  
+- **TransformerVAE**: Main model that combines encoder and decoder with VAE sampling and class conditioning
+- **Steering Mechanism**: Novel loss function that enforces class consistency between intended and generated images
 
 ### Design Principles
 
-- **Clean Separation**: Encoder and decoder handle full images and patch operations internally
-- **VAE Integration**: Proper variational autoencoder with reconstruction and KL divergence losses
+- **Class-Conditioned Generation**: Decoder accepts class labels to steer image generation
+- **Teacher Forcing**: Uses ground truth class labels during training for stable learning
+- **Consistency Loss**: Steering loss ensures generated images match their intended classes
+- **VAE Integration**: Proper variational autoencoder with reconstruction, KL divergence, classification, and steering losses
 - **Patch-based Processing**: Efficient image processing using configurable patch sizes
 - **Self-attention**: Multi-head attention mechanisms for capturing image dependencies
 
 ## Features
 
+- ✅ **Class-Conditioned Generation**: Generate images of specific classes by providing class labels
+- ✅ **Steering Loss**: Novel loss function that enforces consistency between intended and generated classes
+- ✅ **Teacher Forcing**: Stable training using ground truth class labels
+- ✅ **Multi-Objective Training**: Combines reconstruction, KL divergence, classification, and steering losses
 - ✅ **Working Training Pipeline**: Complete training loop with MNIST dataset
-- ✅ **Progress Visualization**: Automatic generation of training progress plots
-- ✅ **GIF Animation**: Creates animated GIF showing training progress
+- ✅ **Progress Visualization**: Automatic generation of training progress plots showing class-specific generation
+- ✅ **GIF Animation**: Creates animated GIF demonstrating the model's ability to generate specific digit classes
 - ✅ **Model Persistence**: Save/load functionality with metadata preservation
 - ✅ **Device Support**: CPU, CUDA, and Apple Silicon (MPS) support
 - ✅ **Flexible Dimensions**: Configurable image sizes, patch sizes, and model dimensions
@@ -66,10 +111,12 @@ This will:
 ### Model Configuration
 
 The current implementation uses:
-- **Dataset**: MNIST (28×28 grayscale images)
+- **Dataset**: MNIST (28×28 grayscale images, 10 classes)
 - **Model**: 128 embedding dim, 4 attention heads, 4 transformer layers
 - **Patches**: 4×4 patch size
-- **Training**: Adam optimizer, learning rate 1e-3, batch size 128
+- **Training**: Adam optimizer, learning rate 2e-4, batch size 128
+- **Loss Weights**: Reconstruction + KL + Classification + 10×Steering loss
+- **Teacher Forcing**: Enabled during training for stable class conditioning
 
 ## Usage
 
@@ -84,7 +131,9 @@ model = TransformerVAE(
     num_heads=4,          # Number of attention heads
     num_layers=4,         # Number of transformer layers
     patch_size=4,         # Size of image patches
-    image_size=(28, 28)   # Input image dimensions
+    num_classes=10,       # Number of classes (MNIST digits 0-9)
+    image_size=(28, 28),  # Input image dimensions
+    teacher_forcing=True  # Enable teacher forcing during training
 )
 ```
 
@@ -104,8 +153,21 @@ runner.train(train_loader, epochs=10)
 ### Generation
 
 ```python
-# Generate new images from random latent vectors
+# Generate new images from random latent vectors (all classes)
 generated_images = runner.generate(num_samples=4)
+
+# Generate images of specific classes
+import torch
+import torch.nn.functional as F
+
+# Create one-hot vectors for specific classes
+class_0 = torch.eye(10)[0:1]  # Generate digit 0
+class_7 = torch.eye(10)[7:8]  # Generate digit 7
+
+# Generate specific digits
+z = torch.randn(1, model.embed_dim, device=device)
+digit_0 = model.decode(z, class_0)
+digit_7 = model.decode(z, class_7)
 ```
 
 ### Model Persistence
@@ -142,7 +204,14 @@ img-gen-transformer/
 
 ## Results
 
-The model successfully trains on MNIST digits, with loss decreasing from ~2900 to ~70 over 10 epochs. The training progress is visualized through automatically generated plots and compiled into an animated GIF showing the model's learning progression.
+The steerable VAE successfully trains on MNIST digits, learning to generate class-consistent images. The training progress shows:
+
+- **Multi-objective optimization**: Reconstruction, KL divergence, classification, and steering losses all decrease over time
+- **Class conditioning**: The model learns to generate images that match their intended classes
+- **Steering effectiveness**: The steering loss ensures generated images are correctly classified as their intended class
+- **Visual progress**: The animated GIF demonstrates the model's ability to generate specific digit classes (0-9) as training progresses
+
+The key innovation is the **steering loss**, which enforces consistency between the intended class and the generated image, making the VAE truly "steerable" by class labels.
 
 ## Contributing
 

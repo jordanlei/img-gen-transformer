@@ -89,7 +89,7 @@ class TransformerBlock(nn.Module):
         return x
 
 class TransformerEncoder(nn.Module):
-    def __init__(self, embed_dim, num_heads, num_layers, patch_size, num_channels, image_size = (28, 28)):
+    def __init__(self, embed_dim, num_heads, num_layers, patch_size, num_channels, num_classes, image_size = (28, 28)):
         super(TransformerEncoder, self).__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -99,7 +99,8 @@ class TransformerEncoder(nn.Module):
         self.image_size = image_size
         self.patch_h = image_size[0] // patch_size
         self.patch_w = image_size[1] // patch_size
-        
+        self.num_classes = num_classes
+
         # Calculate number of patches
         self.num_patches = self.patch_h * self.patch_w
         
@@ -119,6 +120,7 @@ class TransformerEncoder(nn.Module):
         # Output heads for VAE
         self.fc_mu = nn.Linear(embed_dim, embed_dim)
         self.fc_logvar = nn.Linear(embed_dim, embed_dim)
+        self.fc_cls = nn.Linear(embed_dim, num_classes)
     
     def forward(self, x):
         # Input: (batch_size, num_channels, image_height, image_width) - full image
@@ -151,11 +153,12 @@ class TransformerEncoder(nn.Module):
         # Generate VAE parameters
         mu = self.fc_mu(cls_output)
         logvar = self.fc_logvar(cls_output)
+        cls_output = self.fc_cls(cls_output)
         
-        return mu, logvar
+        return mu, logvar, cls_output
 
 class TransformerDecoder(nn.Module):
-    def __init__(self, embed_dim, num_heads, num_layers, patch_size, num_channels, image_size = (28, 28)):
+    def __init__(self, embed_dim, num_heads, num_layers, patch_size, num_channels, num_classes, image_size = (28, 28)):
         super(TransformerDecoder, self).__init__()
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -165,9 +168,12 @@ class TransformerDecoder(nn.Module):
         self.image_size = image_size
         self.patch_h = image_size[0] // patch_size
         self.patch_w = image_size[1] // patch_size
-    
+        self.num_classes = num_classes
+
         # Calculate number of patches
         self.num_patches = self.patch_h * self.patch_w
+
+        self.cls_embed = nn.Linear(num_classes, embed_dim)
         
         # Learnable position embedding for patches (no CLS token needed for generation)
         self.pos_embed = nn.Parameter(torch.randn(1, self.num_patches, embed_dim))
@@ -179,27 +185,35 @@ class TransformerDecoder(nn.Module):
         # Patch reverse - converts patch embeddings back to image
         self.patch_reverse = nn.ConvTranspose2d(embed_dim, num_channels, patch_size, patch_size)
     
-    def forward(self, z):
-        # Input: (batch_size, embed_dim) - latent vector
-        # Output: (batch_size, num_channels, image_height, image_width) - reconstructed image
+    def forward(self, z, cls_input):
         batch_size = z.shape[0]
+
+        # Repeat latent vector for patches
         z = z.unsqueeze(1).repeat(1, self.num_patches, 1)
         z = z + self.pos_embed
-        
+
+        # Map class vector to embedding and add a sequence dimension (1 token)
+        cls_embed = self.cls_embed(cls_input).unsqueeze(1)  # (batch_size, 1, embed_dim)
+
+        # Concatenate class embedding as first token
+        z = torch.cat([cls_embed, z], dim=1)
+
+        # Pass through transformer layers
         for layer in self.layers:
             z = layer(z)
         z = self.norm(z)
-        
-        # Reshape for patch reverse: (batch_size, num_patches, embed_dim) -> (batch_size, embed_dim, H//patch_size, W//patch_size)
+
+        # Remove CLS token before reshaping to patches
+        z = z[:, 1:, :]
+
+        # Reshape for patch reverse
         z = z.transpose(1, 2).view(batch_size, self.embed_dim, self.patch_h, self.patch_w)
-        
-        # Patch reverse: (batch_size, embed_dim, H//patch_size, W//patch_size) -> (batch_size, num_channels, H, W)
         x = self.patch_reverse(z)
-        
+
         return x
 
 class TransformerVAE(nn.Module):
-    def __init__(self, embed_dim, num_channels, num_heads, num_layers, patch_size, image_size=(28, 28)):
+    def __init__(self, embed_dim, num_channels, num_heads, num_layers, patch_size, num_classes, image_size=(28, 28)):
         super(TransformerVAE, self).__init__()
         self.embed_dim = embed_dim
         self.num_channels = num_channels
@@ -207,27 +221,35 @@ class TransformerVAE(nn.Module):
         self.num_layers = num_layers
         self.patch_size = patch_size
         self.image_size = image_size
-        
+        self.num_classes = num_classes
+
         # Encoder and decoder now handle full images and patch operations internally
-        self.encoder = TransformerEncoder(embed_dim, num_heads, num_layers, patch_size, num_channels, image_size)
-        self.decoder = TransformerDecoder(embed_dim, num_heads, num_layers, patch_size, num_channels, image_size)
+        self.encoder = TransformerEncoder(embed_dim, num_heads, num_layers, patch_size, num_channels, num_classes, image_size)
+        self.decoder = TransformerDecoder(embed_dim, num_heads, num_layers, patch_size, num_channels, num_classes, image_size)
 
     def encode(self, x):
         return self.encoder(x)
     
-    def decode(self, z):
-        return self.decoder(z)
+    def decode(self, z, cls_input):
+        return self.decoder(z, cls_input)
     
-    def forward(self, x):
-        mu, logvar = self.encode(x)
+    def forward(self, x, y = None):
+        mu, logvar, cls_output = self.encode(x)
         
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         z = mu + eps * std
         
-        recon_x = self.decode(z)
+        # if y is not None, we are "teacher forcing"
+        # the network to predict class y
+        if y is not None:
+            cls_output = y
+        else: 
+            cls_output = F.softmax(cls_output, dim=1)
+
+        recon_x = self.decode(z, cls_output)
         
-        return recon_x, mu, logvar
+        return recon_x, mu, logvar, cls_output
     
     def save(self, path):
         metadata = {
@@ -237,6 +259,7 @@ class TransformerVAE(nn.Module):
             "num_channels": self.num_channels,
             "num_heads": self.num_heads,
             "num_layers": self.num_layers,
+            "num_classes": self.num_classes
         }
         torch.save({
             "model_state_dict": self.state_dict(),
@@ -255,5 +278,5 @@ class TransformerVAE(nn.Module):
         self.num_channels = metadata["num_channels"]
         self.num_heads = metadata["num_heads"]
         self.num_layers = metadata["num_layers"]
-        
+        self.num_classes = metadata["num_classes"]
         return self

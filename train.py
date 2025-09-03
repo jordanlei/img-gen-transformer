@@ -6,6 +6,8 @@ import torch
 import os
 import glob
 from PIL import Image
+import shutil
+
 
 def write_to_gif(dir = "temp"):
     """Create GIF from saved figures with extended first and last frame durations."""
@@ -29,7 +31,7 @@ def write_to_gif(dir = "temp"):
                 elif i == len(images) - 1:  # Last frame
                     durations.append(3000)  # 3 seconds
                 else:  # Middle frames
-                    durations.append(500)   # 0.5 seconds
+                    durations.append(200)   # 0.5 seconds
             
             # Save as GIF in main directory
             gif_filename = "animation.gif"
@@ -55,6 +57,11 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Using device: {device}")
 
+
+    if os.path.exists("temp"):
+        shutil.rmtree("temp")
+        print("Removing existing temporary directory")
+
     # load data
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -67,27 +74,27 @@ def main():
     
     # load model with correct parameters
     model = TransformerVAE(
-        embed_dim=128, 
+        embed_dim=16, 
         num_channels=1, 
         num_heads=4, 
-        num_layers=4, 
+        num_layers=5, 
         patch_size=4,
-        image_size=(28, 28)  # MNIST images are 28x28
+        num_classes=10,
+        image_size=(28, 28),
     )
     
     # Move model to device
     model = model.to(device)
     
     # load optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     
     os.makedirs("temp", exist_ok=True)
-    runner = Runner(model, optimizer, device)
-    runner.train(train_loader, epochs=10)
+    runner = Runner(model, optimizer, device, teacher_forcing=True)
+    runner.train(train_loader, epochs=20)
     write_to_gif()
     model.save("model.pth")
     # Clean up temporary files
-    import shutil
     if os.path.exists("temp"):
         shutil.rmtree("temp")
         print("Cleaned up temporary directory")
