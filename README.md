@@ -4,15 +4,55 @@ A PyTorch-based **Steerable Vision Transformer Variational Autoencoder (VAE)**. 
 
 ![Training Progress](animation_steerable.gif)
 
-## Overview
+## Table of Contents
 
-This project implements a **Steerable TransformerVAE** that combines Vision Transformer architecture with Variational Autoencoder principles. One key component is the ability to **steer** image generation by providing class labels, allowing you to generate images of specific classes (e.g., "generate a 7" or "generate a 3").
+- [Analysis](#analysis)
+- [Approach](#approach)
+  - [Loss Function](#loss-function)
+- [Quick Start](#quick-start)
+  - [Installation](#installation)
+  - [Training](#training)
+  - [Model Configuration](#model-configuration)
+- [Usage](#usage)
+  - [Basic Model Creation](#basic-model-creation)
+  - [Training](#training-1)
+  - [Generation](#generation)
+- [Project Structure](#project-structure)
+- [Dependencies](#dependencies)
+- [Contributing](#contributing)
+- [License](#license)
 
-The model learns to:
-- Encode images into latent representations with class information
-- Decode latent vectors back to images conditioned on class labels
-- Generate new images of specific classes by providing class cues
-- Maintain consistency between intended class and generated image
+## Analysis
+At a high level, we start with a **Vanilla VAE**, then gradually add more structured supervision to guide its learning. First, we introduce a `class_loss` function, which trains the network to additionally predict the class of the digit. Finally, we add a `steer_loss` function, which trains the network to generate reconstructed images that resemble a **specific target class** of our choosing. By comparing the three models—Vanilla VAE, Class-Loss VAE, and Steerable VAE—we can understand how these loss functions shape both the latent space and the generated images. 
+
+![Generated](demos/model_generation.png)
+*Generated images for the three different models*
+
+**Vanilla VAE:**  
+Even without any class supervision, the Vanilla VAE learns some general statistical structure of MNIST digits: strokes, shapes, and general patterns. However, because it has no notion of classes, it cannot reconstruct a *specific* digit on demand. It simply produces an image that “looks like a digit,” but which digit is unpredictable. Conceptually, the network is capturing overall variations in the dataset but not learning meaningful semantic distinctions between classes.  
+
+**Class-Loss VAE:**  
+When we add the `class_loss`, the network is forced to predict the correct class of the digit from its embedding. This adds semantic meaning to the latent representation: now, nearby points in latent space correspond to digits of the same class. The predicted labels are also fed back into the decoder, helping the network associate certain latent features with recognizable digit classes. Intuitively, the VAE is no longer just modeling “digit-like shapes,” it’s starting to understand categories: “this is a 3, that is a 7,” and so on. The generated images now reflect this class awareness—they look more like the intended digit class, even if the reconstruction isn’t perfectly controlled yet.  
+
+**Steerable VAE:**  
+Finally, the `steer_loss` explicitly enforces that the network’s output matches a **target class** of our choosing. Now we have full control: we can take a latent vector and tell the network to reconstruct it as a 2 or an 8, and it will comply. The network learns to separate the notion of “what is in the latent vector” from “what class to generate,” allowing fine-grained steering of the outputs. Conceptually, this is what makes the VAE *steerable*: we can guide generation along meaningful semantic directions.  
+
+![Embeddings](demos/model_embeddings.png)
+*Embeddings (last layer before encoding classification layer) for different models*
+
+Looking at the embeddings gives us a clear picture of how each modification affects representation learning. The Vanilla VAE produces overlapping embeddings for similar digits—its latent space captures overall structure but not class-specific details. Adding class supervision (Class-Loss VAE) separates the classes more cleanly, creating clusters for each digit. The full Steerable VAE maintains these clusters while also allowing controlled movement along class dimensions, which is what enables targeted image generation.  
+
+![Semantic-Interpolation](demos/generated_interp.png)
+*Interpolating between class 2 and class 8*
+
+The power of a steerable VAE is highlighted when we interpolate between classes. For example, we can take a latent vector and interpolate between a one-hot encoding of class 2 and class 8. The generated images smoothly transition from a 2 to an 8. Intuitively, this shows that the network has learned a continuous, semantically meaningful manifold of digits: small changes in the class vector produce small, predictable changes in the output.  
+
+![Interpolation-Cross](demos/generated_interp_cross.png)
+*Interpolation across classes*
+
+We can generalize this idea to interpolate between any two classes. Each row r and column c in the figure corresponds to an image generated from a latent vector combined with a class vector that is 50% class i and 50% class j—effectively the midpoint between the two classes. On the diagonal, the images reproduce individual classes perfectly. Conceptually, this demonstrates that the model’s latent space is structured and manipulable: we can generate new, semantically meaningful outputs by steering latent vectors along the axes defined by the class information.
+
+
 
 ## Approach
 
@@ -20,9 +60,9 @@ The steerable VAE optimizes a multi-objective loss function that combines four k
 
 ### Loss Function
 
-The total loss combines four components with a 10× weight on the steering loss:
+The total loss combines four components with a 500× weight on the classification loss:
 
-**L_total = L_recon + L_KL + L_class + 10 × L_steer**
+**L_total = L_recon + L_KL + 500 × L_class + L_steer**
 
 #### 1. Reconstruction Loss
 **L_recon = (1/N) × Σ||x_i - x̂_i||²**
@@ -44,40 +84,11 @@ Trains the encoder to correctly classify input images using cross-entropy.
 
 Where ỹ are random class labels and p̃ are the predicted classes of generated images. This enforces consistency between intended and generated classes, making the VAE steerable.
 
-### Teacher Forcing
+### Training Strategy
 
-During training, the model uses ground truth class labels for stable learning. During inference, it uses its own predictions, enabling controlled generation of specific classes.
+During training, the model learns to predict classes from the latent representations without teacher forcing. The decoder uses the predicted class probabilities to generate class-consistent images, enabling controlled generation of specific classes.
 
-## Architecture
 
-### Key Components
-
-- **TransformerEncoder**: Converts full images to latent vectors and class predictions using patch embeddings and transformer layers
-- **TransformerDecoder**: Converts latent vectors back to full images conditioned on class labels using transformer layers and patch decoding  
-- **TransformerVAE**: Main model that combines encoder and decoder with VAE sampling and class conditioning
-- **Steering Mechanism**: Novel loss function that enforces class consistency between intended and generated images
-
-### Design Principles
-
-- **Class-Conditioned Generation**: Decoder accepts class labels to steer image generation
-- **Teacher Forcing**: Uses ground truth class labels during training for stable learning
-- **Consistency Loss**: Steering loss ensures generated images match their intended classes
-- **VAE Integration**: Proper variational autoencoder with reconstruction, KL divergence, classification, and steering losses
-- **Patch-based Processing**: Efficient image processing using configurable patch sizes
-- **Self-attention**: Multi-head attention mechanisms for capturing image dependencies
-
-## Features
-
-- ✅ **Class-Conditioned Generation**: Generate images of specific classes by providing class labels
-- ✅ **Steering Loss**: Novel loss function that enforces consistency between intended and generated classes
-- ✅ **Teacher Forcing**: Stable training using ground truth class labels
-- ✅ **Multi-Objective Training**: Combines reconstruction, KL divergence, classification, and steering losses
-- ✅ **Working Training Pipeline**: Complete training loop with MNIST dataset
-- ✅ **Progress Visualization**: Automatic generation of training progress plots showing class-specific generation
-- ✅ **GIF Animation**: Creates animated GIF demonstrating the model's ability to generate specific digit classes
-- ✅ **Model Persistence**: Save/load functionality with metadata preservation
-- ✅ **Device Support**: CPU, CUDA, and Apple Silicon (MPS) support
-- ✅ **Flexible Dimensions**: Configurable image sizes, patch sizes, and model dimensions
 
 ## Quick Start
 
@@ -114,11 +125,11 @@ This will:
 
 The current implementation uses:
 - **Dataset**: MNIST (28×28 grayscale images, 10 classes)
-- **Model**: 128 embedding dim, 4 attention heads, 4 transformer layers
+- **Model**: 16 embedding dim, 4 attention heads, 5 transformer layers
 - **Patches**: 4×4 patch size
-- **Training**: Adam optimizer, learning rate 2e-4, batch size 128
-- **Loss Weights**: Reconstruction + KL + Classification + 10×Steering loss
-- **Teacher Forcing**: Enabled during training for stable class conditioning
+- **Training**: Adam optimizer, learning rate 5e-3, batch size 128
+- **Loss Weights**: Reconstruction + KL + 500×Classification + Steering loss
+- **Training Strategy**: Self-supervised learning without teacher forcing
 
 ## Usage
 
@@ -128,14 +139,13 @@ The current implementation uses:
 from network import TransformerVAE
 
 model = TransformerVAE(
-    embed_dim=128,        # Embedding dimension
+    embed_dim=16,         # Embedding dimension
     num_channels=1,       # Grayscale images
     num_heads=4,          # Number of attention heads
-    num_layers=4,         # Number of transformer layers
+    num_layers=5,         # Number of transformer layers
     patch_size=4,         # Size of image patches
     num_classes=10,       # Number of classes (MNIST digits 0-9)
-    image_size=(28, 28),  # Input image dimensions
-    teacher_forcing=True  # Enable teacher forcing during training
+    image_size=(28, 28)   # Input image dimensions
 )
 ```
 
@@ -145,7 +155,7 @@ model = TransformerVAE(
 from runner import Runner
 import torch.optim as optim
 
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
+optimizer = optim.Adam(model.parameters(), lr=5e-3)
 runner = Runner(model, optimizer, device)
 
 # Train the model
@@ -155,9 +165,6 @@ runner.train(train_loader, epochs=10)
 ### Generation
 
 ```python
-# Generate new images from random latent vectors (all classes)
-generated_images = runner.generate(num_samples=4)
-
 # Generate images of specific classes
 import torch
 import torch.nn.functional as F
@@ -172,16 +179,7 @@ digit_0 = model.decode(z, class_0)
 digit_7 = model.decode(z, class_7)
 ```
 
-### Model Persistence
 
-```python
-# Save model
-model.save("model.pth")
-
-# Load model
-new_model = TransformerVAE(...)
-new_model.load("model.pth")
-```
 
 ## Project Structure
 
@@ -204,16 +202,7 @@ img-gen-transformer/
 - **matplotlib**: Plotting and visualization
 - **PIL**: Image processing
 
-## Results
 
-The steerable VAE successfully trains on MNIST digits, learning to generate class-consistent images. The training progress shows:
-
-- **Multi-objective optimization**: Reconstruction, KL divergence, classification, and steering losses all decrease over time
-- **Class conditioning**: The model learns to generate images that match their intended classes
-- **Steering effectiveness**: The steering loss ensures generated images are correctly classified as their intended class
-- **Visual progress**: The animated GIF demonstrates the model's ability to generate specific digit classes (0-9) as training progresses
-
-The key innovation is the **steering loss**, which enforces consistency between the intended class and the generated image, making the VAE truly "steerable" by class labels.
 
 ## Contributing
 

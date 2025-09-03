@@ -148,12 +148,12 @@ class TransformerEncoder(nn.Module):
         x = self.norm(x)
         
         # Take CLS token for VAE encoding
-        cls_output = x[:, 0, :]  # (batch_size, embed_dim)
+        self.embedded = x[:, 0, :]  # (batch_size, embed_dim)
         
         # Generate VAE parameters
-        mu = self.fc_mu(cls_output)
-        logvar = self.fc_logvar(cls_output)
-        cls_output = self.fc_cls(cls_output)
+        mu = self.fc_mu(self.embedded)
+        logvar = self.fc_logvar(self.embedded)
+        cls_output = self.fc_cls(self.embedded)
         
         return mu, logvar, cls_output
 
@@ -213,7 +213,7 @@ class TransformerDecoder(nn.Module):
         return x
 
 class TransformerVAE(nn.Module):
-    def __init__(self, embed_dim, num_channels, num_heads, num_layers, patch_size, num_classes, image_size=(28, 28)):
+    def __init__(self, embed_dim = 16, num_channels = 1, num_heads = 4, num_layers = 3, patch_size = 4, num_classes = 10, image_size = (28, 28)):
         super(TransformerVAE, self).__init__()
         self.embed_dim = embed_dim
         self.num_channels = num_channels

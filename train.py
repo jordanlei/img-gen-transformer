@@ -87,11 +87,11 @@ def main():
     model = model.to(device)
     
     # load optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
     
     os.makedirs("temp", exist_ok=True)
-    runner = Runner(model, optimizer, device, teacher_forcing=True)
-    runner.train(train_loader, epochs=20)
+    runner = Runner(model, optimizer, device)
+    runner.train(train_loader, epochs=30)
     write_to_gif()
     model.save("model.pth")
     # Clean up temporary files
