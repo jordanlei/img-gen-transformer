@@ -20,27 +20,29 @@ The steerable VAE optimizes a multi-objective loss function that combines four k
 
 ### Loss Function
 
-$$\mathcal{L}_{total} = \mathcal{L}_{recon} + \mathcal{L}_{KL} + \mathcal{L}_{class} + 10 \cdot \mathcal{L}_{steer}$$
+The total loss combines four components with a 10× weight on the steering loss:
+
+**L_total = L_recon + L_KL + L_class + 10 × L_steer**
 
 #### 1. Reconstruction Loss
-$$\mathcal{L}_{recon} = \frac{1}{N} \sum_{i=1}^{N} ||x_i - \hat{x}_i||_2^2$$
+**L_recon = (1/N) × Σ||x_i - x̂_i||²**
 
 Ensures accurate reconstruction of input images.
 
-#### 2. KL Divergence Loss
-$$\mathcal{L}_{KL} = -\frac{1}{2N} \sum_{i=1}^{N} \sum_{j=1}^{D} (1 + \log(\sigma_{ij}^2) - \mu_{ij}^2 - \sigma_{ij}^2)$$
+#### 2. KL Divergence Loss  
+**L_KL = -(1/2N) × Σ(1 + log(σ²) - μ² - σ²)**
 
 Regularizes the latent space to follow a standard normal distribution.
 
 #### 3. Classification Loss
-$$\mathcal{L}_{class} = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} y_{ic} \log(p_{ic})$$
+**L_class = -(1/N) × Σ y_ic × log(p_ic)**
 
 Trains the encoder to correctly classify input images using cross-entropy.
 
 #### 4. Steering Loss
-$$\mathcal{L}_{steer} = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} \tilde{y}_{ic} \log(\tilde{p}_{ic})$$
+**L_steer = -(1/N) × Σ ỹ_ic × log(p̃_ic)**
 
-Where $\tilde{y}$ are random class labels and $\tilde{p}$ are the predicted classes of generated images. This enforces consistency between intended and generated classes, making the VAE steerable.
+Where ỹ are random class labels and p̃ are the predicted classes of generated images. This enforces consistency between intended and generated classes, making the VAE steerable.
 
 ### Teacher Forcing
 
