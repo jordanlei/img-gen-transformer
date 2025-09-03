@@ -44,7 +44,7 @@ Finally, the `steer_loss` explicitly enforces that the network's output matches 
 
 Looking at the embeddings gives us a clear picture of how each modification affects representation learning. The Vanilla VAE produces overlapping embeddings for similar digits—its latent space captures overall structure but not class-specific details. Adding class supervision (Class-Loss VAE) separates the classes more cleanly, creating clusters for each digit. The full Steerable VAE maintains these clusters while also allowing controlled movement along class dimensions, which is what enables targeted image generation.  
 
-<img src="demos/generated_interp_.png" alt="Interpolating between class 2 and class 8" width="100%"/>
+<img src="demos/generated_interp.png" alt="Interpolating between class 2 and class 8" width="100%"/>
 
 *Interpolating between class 2 and class 8*
 
