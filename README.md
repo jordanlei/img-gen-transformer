@@ -101,7 +101,7 @@ During training, the model learns to predict classes from the latent representat
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd img-gen-transformer
+cd steerable-transformer-vae
 
 # Create and activate virtual environment
 python -m venv .venv
@@ -188,7 +188,7 @@ digit_7 = model.decode(z, class_7)
 ## Project Structure
 
 ```
-img-gen-transformer/
+steerable-transformer-vae/
 ├── network.py           # Core model architecture
 ├── runner.py            # Training and generation utilities
 ├── train.py             # Main training script
