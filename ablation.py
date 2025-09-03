@@ -23,19 +23,19 @@ def main():
     
     # load model with correct parameters
     model = TransformerVAE().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     runner = Runner(model, optimizer, device, use_class_loss=False, use_steer_loss=False)
     runner.train(train_loader, epochs=20)
     runner.save("runner_no_class_no_steer.pkl")
 
     model1 = TransformerVAE().to(device)
-    optimizer1 = torch.optim.Adam(model1.parameters(), lr=5e-3)
+    optimizer1 = torch.optim.Adam(model1.parameters(), lr=1e-2)
     runner = Runner(model1, optimizer1, device, use_class_loss=True, use_steer_loss=False)
     runner.train(train_loader, epochs=20)
     runner.save("runner_class_no_steer.pkl")
 
     model2 = TransformerVAE().to(device)
-    optimizer2 = torch.optim.Adam(model2.parameters(), lr=5e-3)
+    optimizer2 = torch.optim.Adam(model2.parameters(), lr=1e-2)
     runner = Runner(model2, optimizer2, device, use_class_loss=True, use_steer_loss=True)
     runner.train(train_loader, epochs=20)
     runner.save("runner_class_steer.pkl")
