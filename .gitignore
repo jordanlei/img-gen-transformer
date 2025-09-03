@@ -182,7 +182,6 @@ datasets/
 data/
 *.jpg
 *.jpeg
-*.png
 *.bmp
 *.tiff
 *.tif
