@@ -25,36 +25,32 @@ A PyTorch-based **Steerable Vision Transformer Variational Autoencoder (VAE)**. 
 ## Analysis
 At a high level, we start with a **Vanilla VAE**, then gradually add more structured supervision to guide its learning. First, we introduce a `class_loss` function, which trains the network to additionally predict the class of the digit. Finally, we add a `steer_loss` function, which trains the network to generate reconstructed images that resemble a **specific target class** of our choosing. By comparing the three models—Vanilla VAE, Class-Loss VAE, and Steerable VAE—we can understand how these loss functions shape both the latent space and the generated images. 
 
-<img src="demos/model_generation.png" alt="Generated images for the three different models"/>
-
+![Generated](demos/model_generation.png)
 *Generated images for the three different models*
 
 **Vanilla VAE:**  
-Even without any class supervision, the Vanilla VAE learns some general statistical structure of MNIST digits: strokes, shapes, and general patterns. However, because it has no notion of classes, it cannot reconstruct a *specific* digit on demand. It simply produces an image that "looks like a digit," but which digit is unpredictable. Conceptually, the network is capturing overall variations in the dataset but not learning meaningful semantic distinctions between classes.  
+Even without any class supervision, the Vanilla VAE learns some general statistical structure of MNIST digits: strokes, shapes, and general patterns. However, because it has no notion of classes, it cannot reconstruct a *specific* digit on demand. It simply produces an image that “looks like a digit,” but which digit is unpredictable. Conceptually, the network is capturing overall variations in the dataset but not learning meaningful semantic distinctions between classes.  
 
 **Class-Loss VAE:**  
-When we add the `class_loss`, the network is forced to predict the correct class of the digit from its embedding. This adds semantic meaning to the latent representation: now, nearby points in latent space correspond to digits of the same class. The predicted labels are also fed back into the decoder, helping the network associate certain latent features with recognizable digit classes. Intuitively, the VAE is no longer just modeling "digit-like shapes," it's starting to understand categories: "this is a 3, that is a 7," and so on. The generated images now reflect this class awareness—they look more like the intended digit class, even if the reconstruction isn't perfectly controlled yet.  
+When we add the `class_loss`, the network is forced to predict the correct class of the digit from its embedding. This adds semantic meaning to the latent representation: now, nearby points in latent space correspond to digits of the same class. The predicted labels are also fed back into the decoder, helping the network associate certain latent features with recognizable digit classes. Intuitively, the VAE is no longer just modeling “digit-like shapes,” it’s starting to understand categories: “this is a 3, that is a 7,” and so on. The generated images now reflect this class awareness—they look more like the intended digit class, even if the reconstruction isn’t perfectly controlled yet.  
 
 **Steerable VAE:**  
-Finally, the `steer_loss` explicitly enforces that the network's output matches a **target class** of our choosing. Now we have full control: we can take a latent vector and tell the network to reconstruct it as a 2 or an 8, and it will comply. The network learns to separate the notion of "what is in the latent vector" from "what class to generate," allowing fine-grained steering of the outputs. Conceptually, this is what makes the VAE *steerable*: we can guide generation along meaningful semantic directions.  
+Finally, the `steer_loss` explicitly enforces that the network’s output matches a **target class** of our choosing. Now we have full control: we can take a latent vector and tell the network to reconstruct it as a 2 or an 8, and it will comply. The network learns to separate the notion of “what is in the latent vector” from “what class to generate,” allowing fine-grained steering of the outputs. Conceptually, this is what makes the VAE *steerable*: we can guide generation along meaningful semantic directions.  
 
-<img src="demos/model_embeddings.png" alt="Embeddings for different models"/>
-
+![Embeddings](demos/model_embeddings.png)
 *Embeddings (last layer before encoding classification layer) for different models*
 
 Looking at the embeddings gives us a clear picture of how each modification affects representation learning. The Vanilla VAE produces overlapping embeddings for similar digits—its latent space captures overall structure but not class-specific details. Adding class supervision (Class-Loss VAE) separates the classes more cleanly, creating clusters for each digit. The full Steerable VAE maintains these clusters while also allowing controlled movement along class dimensions, which is what enables targeted image generation.  
 
-<img src="demos/generated_interp.png" alt="Interpolating between class 2 and class 8"/>
-
+![Semantic-Interpolation](demos/generated_interp.png)
 *Interpolating between class 2 and class 8*
 
 The power of a steerable VAE is highlighted when we interpolate between classes. For example, we can take a latent vector and interpolate between a one-hot encoding of class 2 and class 8. The generated images smoothly transition from a 2 to an 8. Intuitively, this shows that the network has learned a continuous, semantically meaningful manifold of digits: small changes in the class vector produce small, predictable changes in the output.  
 
-<img src="demos/generated_interp_cross.png" alt="Interpolation across classes"/>
-
+![Interpolation-Cross](demos/generated_interp_cross.png)
 *Interpolation across classes*
 
-We can generalize this idea to interpolate between any two classes. Each row r and column c in the figure corresponds to an image generated from a latent vector combined with a class vector that is 50% class i and 50% class j—effectively the midpoint between the two classes. On the diagonal, the images reproduce individual classes perfectly. Conceptually, this demonstrates that the model's latent space is structured and manipulable: we can generate new, semantically meaningful outputs by steering latent vectors along the axes defined by the class information.
+We can generalize this idea to interpolate between any two classes. Each row r and column c in the figure corresponds to an image generated from a latent vector combined with a class vector that is 50% class i and 50% class j—effectively the midpoint between the two classes. On the diagonal, the images reproduce individual classes perfectly. Conceptually, this demonstrates that the model’s latent space is structured and manipulable: we can generate new, semantically meaningful outputs by steering latent vectors along the axes defined by the class information.
 
 
 
